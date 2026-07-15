@@ -13,6 +13,40 @@ cd "$SCRIPT_DIR"
 COMPOSE_FILE="docker-compose.on-premise.yml"
 ENV_FILE=".env"
 
+print_usage() {
+  cat <<'USAGE'
+Usage: ./install.sh [flags]
+
+Runs interactively by default, prompting for anything not passed as a flag.
+Pass all required flags to run fully non-interactively.
+
+  --domain=...                   Domain for the main CRM
+  --super-admin-domain=...       Domain for the super admin panel
+  --license=...                  License key (provided at contract signing)
+
+  --mail-provider=mailgun|smtp   Which mail provider to use
+
+  --mailgun-domain=...           Mailgun domain
+  --mailgun-api-key=...          Mailgun API key
+  --mailgun-region=us|eu         Mailgun account region — check your Mailgun dashboard
+
+  --smtp-host=...                SMTP server host
+  --smtp-port=...                SMTP server port (defaults to 587 if left blank interactively)
+  --smtp-username=...            SMTP username
+  --smtp-password=...            SMTP password
+
+  --mail-sender=...              Sender email, e.g. "Your Company <noreply@yourcompany.com>"
+  --cors-origins=...             Optional, derived from the two domains above if omitted
+  --s3-public-url=...            Optional, only needed for public file URLs
+  --super-admin-email=...        Email for the initial super admin account
+
+  --resume                       Reuse an existing .env instead of generating a new one
+                                  (use this to retry after a failed first-time install)
+
+  --help, -h                     Show this message and exit
+USAGE
+}
+
 # ── Flag parsing ──────────────────────────────────────────────────────────────
 BASE_DOMAIN=""
 SUPER_ADMIN_DOMAIN=""
@@ -49,6 +83,10 @@ for arg in "$@"; do
     --s3-public-url=*) S3_PUBLIC_URL="${arg#*=}" ;;
     --super-admin-email=*) BOOTSTRAP_SUPER_ADMIN_EMAIL="${arg#*=}" ;;
     --resume) RESUME=true ;;
+    --help|-h)
+      print_usage
+      exit 0
+      ;;
     *)
       echo "Unknown argument: $arg" >&2
       exit 1
