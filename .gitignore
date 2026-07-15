@@ -1,0 +1,4 @@
+.env
+docker-compose.on-premise.yml.bak
+.idea
+*.override.yml
