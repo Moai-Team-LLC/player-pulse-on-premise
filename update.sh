@@ -65,8 +65,7 @@ if [ "${1:-}" = "--rollback" ]; then
     echo "No previous version recorded to roll back to." >&2
     exit 1
   fi
-  sed -i.bak '$d' "$VERSION_HISTORY_FILE" && rm -f "${VERSION_HISTORY_FILE}.bak"
-  VERSION="$(tail -n1 "$VERSION_HISTORY_FILE")"
+  VERSION="$(tail -n2 "$VERSION_HISTORY_FILE" | head -n1)"
   echo "Rolling back to the last known-good version: ${VERSION}"
 else
   VERSION="${1:-}"
@@ -205,10 +204,10 @@ done
 
 echo
 if [ "$HEALTHY" = true ]; then
-  # A rollback's target is already the top of the history stack (we popped
-  # down to it above) — only a normal forward update pushes a new entry.
   if [ "$ROLLBACK" = false ]; then
     echo "$VERSION" >> "$VERSION_HISTORY_FILE"
+  else
+    sed -i.bak '$d' "$VERSION_HISTORY_FILE" && rm -f "${VERSION_HISTORY_FILE}.bak"
   fi
   echo "Update to ${VERSION} complete. API is healthy."
   echo "See what's new: https://github.com/${REPO}/releases/tag/${TAG}"
