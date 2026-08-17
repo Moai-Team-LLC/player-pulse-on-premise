@@ -19,9 +19,10 @@ VERSION_HISTORY_FILE=".version_history"
 
 installed_version() {
   local image
-  image="$(docker compose -f "$COMPOSE_FILE" ps --format '{{.Image}}' api 2>/dev/null || true)"
-  [ -n "$image" ] || return
-  echo "${image##*:}"
+  image="$(docker compose -f "$COMPOSE_FILE" ps -a --format '{{.Image}}' api 2>/dev/null || true)"
+  if [ -n "$image" ]; then
+    echo "${image##*:}"
+  fi
 }
 
 # Bootstrap history with whatever's currently deployed, the first time this
@@ -29,19 +30,25 @@ installed_version() {
 # very first update would have nothing to fall back to.
 if [ ! -f "$VERSION_HISTORY_FILE" ]; then
   bootstrap="$(installed_version)"
-  [ -n "$bootstrap" ] && echo "$bootstrap" > "$VERSION_HISTORY_FILE"
+  if [ -n "$bootstrap" ]; then
+    echo "$bootstrap" > "$VERSION_HISTORY_FILE"
+  fi
 fi
 
 # ── --check: read-only, reports how far behind the latest release, changes nothing ──
 if [ "${1:-}" = "--check" ]; then
-  current="$(installed_version)"
+  if [ -f "$VERSION_HISTORY_FILE" ]; then
+    current="$(tail -n1 "$VERSION_HISTORY_FILE")"
+  else
+    current="$(installed_version)"
+  fi
   if [ -z "$current" ]; then
     echo "Could not determine the currently installed version — is the 'api' container running?" >&2
     exit 1
   fi
   echo "Currently installed: ${current}"
 
-  latest="$(curl -sf "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"tag_name"' | head -n1 | sed -E 's/.*"tag_name": *"v?([^"]+)".*/\1/')"
+  latest="$(curl -sf "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"tag_name"' | head -n1 | sed -E 's/.*"tag_name": *"v?([^"]+)".*/\1/' || true)"
   if [ -z "$latest" ]; then
     echo "Could not reach GitHub to check the latest release." >&2
     exit 1
@@ -60,8 +67,12 @@ fi
 ROLLBACK=false
 if [ "${1:-}" = "--rollback" ]; then
   ROLLBACK=true
-  entry_count="$(wc -l < "$VERSION_HISTORY_FILE" | tr -d ' ')"
-  if [ "$entry_count" -lt 2 ]; then
+  if [ ! -f "$VERSION_HISTORY_FILE" ]; then
+    echo "No previous version recorded to roll back to." >&2
+    exit 1
+  fi
+  entry_count="$(wc -l < "$VERSION_HISTORY_FILE" | tr -d ' ' || true)"
+  if [ -z "$entry_count" ] || [ "$entry_count" -lt 2 ]; then
     echo "No previous version recorded to roll back to." >&2
     exit 1
   fi
@@ -191,7 +202,7 @@ docker compose "${COMPOSE_ARGS[@]}" up -d
 
 # ── Health check ──────────────────────────────────────────────────────────────
 echo "Waiting for API to become healthy..."
-API_PORT_VALUE="$(grep '^API_PORT=' .env | cut -d= -f2)"
+API_PORT_VALUE="$(grep '^API_PORT=' .env | cut -d= -f2 || true)"
 
 HEALTHY=false
 for _ in $(seq 1 30); do
