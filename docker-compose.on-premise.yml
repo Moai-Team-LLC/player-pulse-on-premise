@@ -2,7 +2,7 @@ services:
 
   # migrations
   migrations:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.0.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
     command: [ "./migrations", "migrate:up" ]
     restart: "no"
     env_file: .env
@@ -17,7 +17,7 @@ services:
 
   # core application
   api:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.0.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
     command: [ "./api" ]
     restart: unless-stopped
     env_file: .env
@@ -35,12 +35,12 @@ services:
       minio-init:
         condition: service_completed_successfully
     ports:
-      - "${API_PORT}:8000"
+      - "${API_PORT:-8000}:8000"
     networks:
       - internal
 
   connector:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.0.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
     command: [ "./connector" ]
     restart: unless-stopped
     env_file: .env
@@ -56,12 +56,12 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "${CONNECTOR_PORT}:8001"
+      - "${CONNECTOR_PORT:-8001}:8001"
     networks:
       - internal
 
   outbox_worker:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.0.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
     command: [ "./outbox_worker" ]
     restart: unless-stopped
     env_file: .env
@@ -78,12 +78,81 @@ services:
     networks:
       - internal
 
+  # adapters — only start when their type is listed in COMPOSE_PROFILES
+  adapter_mailgun:
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    command: [ "./adapter_mailgun" ]
+    profiles: [ "mailgun" ]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PGX_DATABASE: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_ADDRESS: redis:6379
+      LISTEN_PORT: "8002"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${ADAPTER_MAILGUN_PORT:-8002}:8002"
+    networks:
+      - internal
+
+  adapter_voiso:
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    command: [ "./adapter_voiso" ]
+    profiles: [ "voiso" ]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PGX_DATABASE: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_ADDRESS: redis:6379
+      LISTEN_PORT: "8003"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      - "${ADAPTER_VOISO_PORT:-8003}:8003"
+    networks:
+      - internal
+
+  adapter_sms_retail:
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    command: [ "./adapter_sms_retail" ]
+    profiles: [ "sms-retail" ]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PGX_DATABASE: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_ADDRESS: redis:6379
+      LISTEN_PORT: "8004"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${ADAPTER_SMS_RETAIL_PORT:-8004}:8004"
+    networks:
+      - internal
+
   # frontend
   frontend:
-    image: ghcr.io/moai-team-llc/player-pulse-frontend-on-premise:1.0.0
+    image: ghcr.io/moai-team-llc/player-pulse-frontend-on-premise:1.1.0
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT}:80"
+      - "${FRONTEND_PORT:-3000}:80"
     networks:
       - internal
 
@@ -91,7 +160,7 @@ services:
     image: ghcr.io/moai-team-llc/player-pulse-super-admin-on-premise:1.0.0
     restart: unless-stopped
     ports:
-      - "${SUPERADMIN_PORT}:80"
+      - "${SUPERADMIN_PORT:-3001}:80"
     networks:
       - internal
 
@@ -149,8 +218,8 @@ services:
       timeout: 5s
       retries: 10
     ports:
-      - "${MINIO_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     networks:
       - internal
 

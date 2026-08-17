@@ -40,8 +40,22 @@ Pass all required flags to run fully non-interactively.
   --s3-public-url=...            Optional, only needed for public file URLs
   --super-admin-email=...        Email for the initial super admin account
 
+  --adapters=...                 Optional, comma-separated. Leave empty to run with none —
+                                 you can add adapters later by editing COMPOSE_PROFILES in
+                                 .env and running docker compose up -d.
+
+  --api-port=...                 Host port for the API (defaults to 8000 if left blank interactively)
+  --connector-port=...           Host port for the connector (defaults to 8001)
+  --frontend-port=...            Host port for the CRM frontend (defaults to 3000)
+  --superadmin-port=...          Host port for the super admin panel (defaults to 3001)
+  --minio-port=...               Host port for the MinIO S3 API (defaults to 9000)
+  --minio-console-port=...       Host port for the MinIO web console (defaults to 9001)
+  --adapter-mailgun-port=...     Host port for the mailgun adapter (defaults to 8002)
+  --adapter-voiso-port=...       Host port for the voiso adapter (defaults to 8003)
+  --adapter-sms-retail-port=...  Host port for the sms-retail adapter (defaults to 8004)
+
   --resume                       Reuse an existing .env instead of generating a new one
-                                  (use this to retry after a failed first-time install)
+                                 (use this to retry after a failed first-time install)
 
   --help, -h                     Show this message and exit
 USAGE
@@ -63,6 +77,16 @@ MAIL_SENDER_EMAIL=""
 CORS_ORIGINS=""
 S3_PUBLIC_URL=""
 BOOTSTRAP_SUPER_ADMIN_EMAIL=""
+ADAPTER_PROFILES=""
+API_PORT=""
+CONNECTOR_PORT=""
+FRONTEND_PORT=""
+SUPERADMIN_PORT=""
+MINIO_PORT=""
+MINIO_CONSOLE_PORT=""
+ADAPTER_MAILGUN_PORT=""
+ADAPTER_VOISO_PORT=""
+ADAPTER_SMS_RETAIL_PORT=""
 RESUME=false
 
 for arg in "$@"; do
@@ -82,6 +106,16 @@ for arg in "$@"; do
     --cors-origins=*) CORS_ORIGINS="${arg#*=}" ;;
     --s3-public-url=*) S3_PUBLIC_URL="${arg#*=}" ;;
     --super-admin-email=*) BOOTSTRAP_SUPER_ADMIN_EMAIL="${arg#*=}" ;;
+    --adapters=*) ADAPTER_PROFILES="${arg#*=}" ;;
+    --api-port=*) API_PORT="${arg#*=}" ;;
+    --connector-port=*) CONNECTOR_PORT="${arg#*=}" ;;
+    --frontend-port=*) FRONTEND_PORT="${arg#*=}" ;;
+    --superadmin-port=*) SUPERADMIN_PORT="${arg#*=}" ;;
+    --minio-port=*) MINIO_PORT="${arg#*=}" ;;
+    --minio-console-port=*) MINIO_CONSOLE_PORT="${arg#*=}" ;;
+    --adapter-mailgun-port=*) ADAPTER_MAILGUN_PORT="${arg#*=}" ;;
+    --adapter-voiso-port=*) ADAPTER_VOISO_PORT="${arg#*=}" ;;
+    --adapter-sms-retail-port=*) ADAPTER_SMS_RETAIL_PORT="${arg#*=}" ;;
     --resume) RESUME=true ;;
     --help|-h)
       print_usage
@@ -95,13 +129,33 @@ for arg in "$@"; do
 done
 
 # ── Prerequisites ─────────────────────────────────────────────────────────────
+# Forwards whatever was already given via flags (empty is fine — preflight
+# falls back to an existing .env, then documented defaults, for anything not
+# passed here). On --resume this means preflight checks the real values
+# already on disk, not just bare defaults.
 echo "Checking prerequisites..."
+echo
 
-command -v docker >/dev/null 2>&1 || { echo "docker is required but not installed." >&2; exit 1; }
-docker compose version >/dev/null 2>&1 || { echo "docker compose v2 plugin is required but not found." >&2; exit 1; }
-command -v openssl >/dev/null 2>&1 || { echo "openssl is required but not installed." >&2; exit 1; }
-command -v curl >/dev/null 2>&1 || { echo "curl is required but not installed." >&2; exit 1; }
+if ! ./preflight.sh \
+  --domain="$BASE_DOMAIN" \
+  --super-admin-domain="$SUPER_ADMIN_DOMAIN" \
+  --adapters="$ADAPTER_PROFILES" \
+  --api-port="$API_PORT" \
+  --connector-port="$CONNECTOR_PORT" \
+  --frontend-port="$FRONTEND_PORT" \
+  --superadmin-port="$SUPERADMIN_PORT" \
+  --minio-port="$MINIO_PORT" \
+  --minio-console-port="$MINIO_CONSOLE_PORT" \
+  --adapter-mailgun-port="$ADAPTER_MAILGUN_PORT" \
+  --adapter-voiso-port="$ADAPTER_VOISO_PORT" \
+  --adapter-sms-retail-port="$ADAPTER_SMS_RETAIL_PORT"
+then
+  echo >&2
+  echo "Preflight found critical issues — fix them, then re-run ./install.sh." >&2
+  exit 1
+fi
 
+echo
 echo "Prerequisites OK."
 echo
 
@@ -125,6 +179,14 @@ else
     if [ -z "$current_value" ]; then
       read -r -p "$prompt_text: " input || true
       eval "$var_name=\"\$input\""
+    fi
+  }
+
+  prompt_with_default() {
+    local var_name="$1" prompt_text="$2" default_value="$3" current_value="${!1}" input=""
+    if [ -z "$current_value" ]; then
+      read -r -p "$prompt_text [$default_value]: " input || true
+      eval "$var_name=\"\${input:-$default_value}\""
     fi
   }
 
@@ -156,6 +218,70 @@ else
 
   prompt MAIL_SENDER_EMAIL "Sender email address for password reset emails"
   prompt BOOTSTRAP_SUPER_ADMIN_EMAIL "Email address for the initial super admin account"
+
+  if [ -z "$ADAPTER_PROFILES" ]; then
+    echo
+    echo "Adapters are optional — you can skip this and add one later by editing"
+    echo "COMPOSE_PROFILES in .env and running docker compose up -d."
+    echo "Available: mailgun, voiso, sms-retail"
+    read -r -p "Adapters to activate now (comma-separated, or blank to skip): " ADAPTER_PROFILES || true
+  fi
+
+  if [ -n "$ADAPTER_PROFILES" ]; then
+    IFS=',' read -ra profiles <<< "$ADAPTER_PROFILES"
+    for p in "${profiles[@]}"; do
+      case "$p" in
+        mailgun|voiso|sms-retail) ;;
+        *)
+          echo "Unknown adapter: '$p' — must be one of: mailgun, voiso, sms-retail" >&2
+          exit 1
+          ;;
+      esac
+    done
+  fi
+
+  echo
+  echo "Host ports — press Enter to accept the default, or enter a different"
+  echo "port if one of these is already taken on your server."
+  prompt_with_default API_PORT "API port" 8000
+  prompt_with_default CONNECTOR_PORT "Connector port" 8001
+  prompt_with_default FRONTEND_PORT "Frontend port" 3000
+  prompt_with_default SUPERADMIN_PORT "Super admin port" 3001
+  prompt_with_default MINIO_PORT "MinIO S3 API port" 9000
+  prompt_with_default MINIO_CONSOLE_PORT "MinIO console port" 9001
+  if [[ ",$ADAPTER_PROFILES," == *",mailgun,"* ]]; then
+    prompt_with_default ADAPTER_MAILGUN_PORT "Mailgun adapter port" 8002
+  else
+    ADAPTER_MAILGUN_PORT="${ADAPTER_MAILGUN_PORT:-8002}"
+  fi
+  if [[ ",$ADAPTER_PROFILES," == *",voiso,"* ]]; then
+    prompt_with_default ADAPTER_VOISO_PORT "Voiso adapter port" 8003
+  else
+    ADAPTER_VOISO_PORT="${ADAPTER_VOISO_PORT:-8003}"
+  fi
+  if [[ ",$ADAPTER_PROFILES," == *",sms-retail,"* ]]; then
+    prompt_with_default ADAPTER_SMS_RETAIL_PORT "SMS-RETAIL adapter port" 8004
+  else
+    ADAPTER_SMS_RETAIL_PORT="${ADAPTER_SMS_RETAIL_PORT:-8004}"
+  fi
+
+  # Every port must be unique, even across adapters you haven't activated yet
+  # — otherwise activating one later, with a port that collides with something
+  # already running, fails with a confusing Docker bind error at that point
+  # instead of here, where it's easy to fix.
+  port_names=(API_PORT CONNECTOR_PORT FRONTEND_PORT SUPERADMIN_PORT MINIO_PORT MINIO_CONSOLE_PORT ADAPTER_MAILGUN_PORT ADAPTER_VOISO_PORT ADAPTER_SMS_RETAIL_PORT)
+  for ((i = 0; i < ${#port_names[@]}; i++)); do
+    for ((j = i + 1; j < ${#port_names[@]}; j++)); do
+      name_i="${port_names[i]}"
+      name_j="${port_names[j]}"
+      if [ "${!name_i}" = "${!name_j}" ]; then
+        echo "Port conflict: $name_i and $name_j are both set to ${!name_i}." >&2
+        echo "Every port must be different, even for an adapter you haven't" >&2
+        echo "activated yet — pick a different value for one of them." >&2
+        exit 1
+      fi
+    done
+  done
 
   if [ -z "$CORS_ORIGINS" ]; then
     CORS_ORIGINS="https://${BASE_DOMAIN},https://${SUPER_ADMIN_DOMAIN}"
@@ -205,6 +331,7 @@ else
   SIGNING_KEY="$(openssl rand -hex 32)"
   MAIL_SIGNING_KEY="$(openssl rand -hex 32)"
   PII_MASTER_KEY="$(openssl rand -hex 32)"
+  ADAPTER_CREDENTIALS_MASTER_KEY="$(openssl rand -hex 32)"
   MINIO_ROOT_USER="$(openssl rand -hex 8)"
   MINIO_ROOT_PASSWORD="$(openssl rand -hex 32)"
   S3_ACCESS_KEY="$(openssl rand -hex 8)"
@@ -225,12 +352,17 @@ else
   cat > "$ENV_FILE" <<EOF
 LICENSE_KEY=${LICENSE_KEY}
 
-API_PORT=8000
-CONNECTOR_PORT=8001
-FRONTEND_PORT=3000
-SUPERADMIN_PORT=3001
-MINIO_PORT=9000
-MINIO_CONSOLE_PORT=9001
+API_PORT=${API_PORT}
+CONNECTOR_PORT=${CONNECTOR_PORT}
+FRONTEND_PORT=${FRONTEND_PORT}
+SUPERADMIN_PORT=${SUPERADMIN_PORT}
+MINIO_PORT=${MINIO_PORT}
+MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT}
+ADAPTER_MAILGUN_PORT=${ADAPTER_MAILGUN_PORT}
+ADAPTER_VOISO_PORT=${ADAPTER_VOISO_PORT}
+ADAPTER_SMS_RETAIL_PORT=${ADAPTER_SMS_RETAIL_PORT}
+
+COMPOSE_PROFILES=${ADAPTER_PROFILES}
 
 APP_PRODUCTION=true
 LOGIN_VERIFICATION_ENABLED=true
@@ -280,6 +412,8 @@ BOOTSTRAP_SUPER_ADMIN_EMAIL=${BOOTSTRAP_SUPER_ADMIN_EMAIL}
 BOOTSTRAP_SUPER_ADMIN_PASSWORD=${BOOTSTRAP_SUPER_ADMIN_PASSWORD}
 
 PII_MASTER_KEY=${PII_MASTER_KEY}
+
+ADAPTER_CREDENTIALS_MASTER_KEY=${ADAPTER_CREDENTIALS_MASTER_KEY}
 
 S3_ENDPOINT=http://minio:9000
 S3_REGION=us-east-1
