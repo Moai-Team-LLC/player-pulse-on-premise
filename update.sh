@@ -15,12 +15,13 @@ cd "$SCRIPT_DIR" || exit 1
 REPO="Moai-Team-LLC/player-pulse-on-premise"
 COMPOSE_FILE="docker-compose.on-premise.yml"
 BACKUP_FILE="docker-compose.on-premise.yml.bak"
-IMAGE_NAME="player-pulse-backend-on-premise"
 VERSION_HISTORY_FILE=".version_history"
 
 installed_version() {
-  [ -f "$COMPOSE_FILE" ] || return
-  grep "${IMAGE_NAME}:" "$COMPOSE_FILE" 2>/dev/null | head -n1 | sed -E "s/.*${IMAGE_NAME}:([^\"' ]+).*/\\1/"
+  local image
+  image="$(docker compose -f "$COMPOSE_FILE" ps --format '{{.Image}}' api 2>/dev/null || true)"
+  [ -n "$image" ] || return
+  echo "${image##*:}"
 }
 
 # Bootstrap history with whatever's currently deployed, the first time this
@@ -35,7 +36,7 @@ fi
 if [ "${1:-}" = "--check" ]; then
   current="$(installed_version)"
   if [ -z "$current" ]; then
-    echo "Could not determine the currently installed version from ${COMPOSE_FILE}." >&2
+    echo "Could not determine the currently installed version — is the 'api' container running?" >&2
     exit 1
   fi
   echo "Currently installed: ${current}"
