@@ -2,7 +2,7 @@ services:
 
   # migrations
   migrations:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
     command: [ "./migrations", "migrate:up" ]
     restart: "no"
     env_file: .env
@@ -17,7 +17,7 @@ services:
 
   # core application
   api:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
     command: [ "./api" ]
     restart: unless-stopped
     env_file: .env
@@ -40,7 +40,7 @@ services:
       - internal
 
   connector:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
     command: [ "./connector" ]
     restart: unless-stopped
     env_file: .env
@@ -61,7 +61,7 @@ services:
       - internal
 
   outbox_worker:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
     command: [ "./outbox_worker" ]
     restart: unless-stopped
     env_file: .env
@@ -80,7 +80,7 @@ services:
 
   # adapters — only start when their type is listed in COMPOSE_PROFILES
   adapter_mailgun:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
     command: [ "./adapter_mailgun" ]
     profiles: [ "mailgun" ]
     restart: unless-stopped
@@ -102,7 +102,7 @@ services:
       - internal
 
   adapter_voiso:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
     command: [ "./adapter_voiso" ]
     profiles: [ "voiso" ]
     restart: unless-stopped
@@ -126,7 +126,7 @@ services:
       - internal
 
   adapter_sms_retail:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.0
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
     command: [ "./adapter_sms_retail" ]
     profiles: [ "sms-retail" ]
     restart: unless-stopped
@@ -157,7 +157,7 @@ services:
       - internal
 
   superadmin:
-    image: ghcr.io/moai-team-llc/player-pulse-super-admin-on-premise:1.0.0
+    image: ghcr.io/moai-team-llc/player-pulse-super-admin-on-premise:1.1.0
     restart: unless-stopped
     ports:
       - "${SUPERADMIN_PORT:-3001}:80"
