@@ -26,7 +26,8 @@ Player Pulse работает как набор Docker-контейнеров н
 
 `postgres`, `redis` и контейнеры адаптеров всегда определены в стеке —
 адаптеры просто не запускаются, пока их не активируют. `minio` —
-хранилище файлов по умолчанию, его можно заменить на собственного
+хранилище файлов по умолчанию: удобно для старта, без лишней настройки.
+Для реальной продакшн-установки мы рекомендуем перейти на собственного
 S3-совместимого провайдера — см. «Использование внешнего файлового
 хранилища» в разделе 5.
 
@@ -50,7 +51,7 @@ S3-совместимого провайдера — см. «Использов�
 публично.
 
 Вам **не** нужны учётные данные ни для одного опционального адаптера
-(Mailgun для коммуникации с игроками, Voiso, SMS-RETAIL и т.д.), чтобы
+(Mailgun для коммуникации с игроками, Voiso, SMS-RETAIL, Intercom для чата и т.д.), чтобы
 установить систему. Активация адаптера просто запускает его контейнер —
 настоящие учётные данные аккаунта этой интеграции вводятся позже, отдельно
 для каждого проекта, внутри самой CRM, после входа — см. раздел 4.
@@ -128,6 +129,7 @@ chmod +x install.sh update.sh
 | `mailgun`    | Отправка email игрокам                    |
 | `voiso`      | Телефония (click-to-call, журнал звонков) |
 | `sms-retail` | SMS-рассылки                              |
+| `intercom`   | Онлайн-чат                                |
 
 Необязательно решать всё заранее — активация адаптера в любой момент это
 однострочное изменение в `.env`, без переустановки:
@@ -165,6 +167,7 @@ docker compose -f docker-compose.on-premise.yml up -d
 | Адаптер Mailgun     |         8002 | `--adapter-mailgun-port=`    |
 | Адаптер Voiso       |         8003 | `--adapter-voiso-port=`      |
 | Адаптер SMS-RETAIL  |         8004 | `--adapter-sms-retail-port=` |
+| Адаптер Intercom    |         8005 | `--adapter-intercom-port=`   |
 
 Все порты должны быть уникальными — даже для адаптера, который вы ещё не
 активировали, так как его порт всё равно зарезервирован в `.env` на момент,
@@ -228,6 +231,7 @@ Pass all required flags to run fully non-interactively.
   --adapter-mailgun-port=...     Host port for the mailgun adapter (defaults to 8002)
   --adapter-voiso-port=...       Host port for the voiso adapter (defaults to 8003)
   --adapter-sms-retail-port=...  Host port for the sms-retail adapter (defaults to 8004)
+  --adapter-intercom-port=...    Host port for the intercom adapter (defaults to 8005)
 
   --resume                       Reuse an existing .env instead of generating a new one
                                  (use this to retry after a failed first-time install)
@@ -275,15 +279,18 @@ PII_MASTER_KEY=<длинная шестнадцатеричная строка>
 
 Войдите с данными, выведенными в конце установки, и сразу же смените пароль.
 
-### Использование внешнего файлового хранилища (опционально)
+### Использование внешнего файлового хранилища (рекомендуется для продакшна)
 
 MinIO поставляется в комплекте по умолчанию — без дополнительной настройки,
-готов к работе для брендинговых материалов тенанта (логотипов) и записей
-звонков (после активации адаптера телефонии). Если вы предпочитаете
-использовать собственное S3-совместимое хранилище (AWS S3, DigitalOcean
-Spaces, Cloudflare R2, Backblaze B2, Wasabi или любое другое, поддерживающее
-S3 API) — можно подключить его вместо MinIO. Это полностью опционально —
-пропустите этот раздел, если MinIO вас устраивает.
+что удобно для старта или тестирования. Для реальной продакшн-установки мы
+рекомендуем перейти на собственное S3-совместимое хранилище (AWS S3,
+DigitalOcean Spaces, Cloudflare R2, Backblaze B2, Wasabi или любое другое,
+поддерживающее S3 API), а не полагаться долгосрочно на контейнер MinIO —
+это на одну инфраструктурную единицу меньше, которую нужно поддерживать и
+обновлять на вашем сервере, плюс это управляемое хранилище, а не контейнер,
+за который отвечаете вы сами. Для тестовой установки это необязательно —
+можно пропустить сейчас, если вы просто оцениваете систему, но стоит
+вернуться к этому перед переходом на реальные данные.
 
 1. Создайте бакет у вашего провайдера и сгенерируйте пару access
    key/secret для него.
@@ -379,6 +386,14 @@ server {
 
     location /webhooks/sms-retail {
         proxy_pass http://localhost:8004;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /webhooks/intercom {
+        proxy_pass http://localhost:8005;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

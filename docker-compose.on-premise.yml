@@ -2,7 +2,7 @@ services:
 
   # migrations
   migrations:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.2.0
     command: [ "./migrations", "migrate:up" ]
     restart: "no"
     env_file: .env
@@ -17,7 +17,7 @@ services:
 
   # core application
   api:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.2.0
     command: [ "./api" ]
     restart: unless-stopped
     env_file: .env
@@ -40,7 +40,7 @@ services:
       - internal
 
   connector:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.2.0
     command: [ "./connector" ]
     restart: unless-stopped
     env_file: .env
@@ -61,7 +61,7 @@ services:
       - internal
 
   outbox_worker:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.2.0
     command: [ "./outbox_worker" ]
     restart: unless-stopped
     env_file: .env
@@ -80,7 +80,7 @@ services:
 
   # adapters — only start when their type is listed in COMPOSE_PROFILES
   adapter_mailgun:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.2.0
     command: [ "./adapter_mailgun" ]
     profiles: [ "mailgun" ]
     restart: unless-stopped
@@ -102,7 +102,7 @@ services:
       - internal
 
   adapter_voiso:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.2.0
     command: [ "./adapter_voiso" ]
     profiles: [ "voiso" ]
     restart: unless-stopped
@@ -126,7 +126,7 @@ services:
       - internal
 
   adapter_sms_retail:
-    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.1.1
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.2.0
     command: [ "./adapter_sms_retail" ]
     profiles: [ "sms-retail" ]
     restart: unless-stopped
@@ -147,9 +147,31 @@ services:
     networks:
       - internal
 
+  adapter_intercom:
+    image: ghcr.io/moai-team-llc/player-pulse-backend-on-premise:1.2.0
+    command: [ "./adapter_intercom" ]
+    profiles: [ "intercom" ]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PGX_DATABASE: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_ADDRESS: redis:6379
+      LISTEN_PORT: "8005"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${ADAPTER_INTERCOM_PORT:-8005}:8005"
+    networks:
+      - internal
+
   # frontend
   frontend:
-    image: ghcr.io/moai-team-llc/player-pulse-frontend-on-premise:1.1.0
+    image: ghcr.io/moai-team-llc/player-pulse-frontend-on-premise:1.2.0
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:80"
@@ -204,14 +226,14 @@ services:
       - internal
 
   minio:
-    image: minio/minio
+    image: bitnamilegacy/minio:latest
     restart: unless-stopped
-    command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER: "on"
     volumes:
-      - minio_data:/data
+      - minio_data:/bitnami/minio/data
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 5s
@@ -224,7 +246,7 @@ services:
       - internal
 
   minio-init:
-    image: minio/mc
+    image: bitnamilegacy/minio:latest
     restart: "no"
     depends_on:
       minio:

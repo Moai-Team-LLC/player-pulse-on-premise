@@ -25,6 +25,8 @@ installed_version() {
   fi
 }
 
+OLD_MINIO_IMAGE="$(docker compose -f "$COMPOSE_FILE" ps -a --format '{{.Image}}' minio 2>/dev/null || true)"
+
 # Bootstrap history with whatever's currently deployed, the first time this
 # script ever tracks versions — otherwise the very first --rollback after the
 # very first update would have nothing to fall back to.
@@ -192,6 +194,15 @@ OVERRIDE_FILE="$(find . -maxdepth 1 -name '*.override.yml' -print -quit)"
 if [ -n "$OVERRIDE_FILE" ]; then
   echo "Found private adapter override: ${OVERRIDE_FILE}"
   COMPOSE_ARGS+=(-f "$OVERRIDE_FILE")
+fi
+
+# ── MinIO ownership fix (one-time, only when upgrading off the old image) ───
+if [[ "$OLD_MINIO_IMAGE" == *"minio/minio"* ]]; then
+  MINIO_VOLUME="$(docker volume ls --filter label=com.docker.compose.volume=minio_data --format '{{.Name}}' | head -n1)"
+  if [ -n "$MINIO_VOLUME" ]; then
+    echo "Fixing MinIO volume ownership for the new image (one-time)..."
+    docker run --rm -v "${MINIO_VOLUME}:/data" alpine chown -R 1001:1001 /data
+  fi
 fi
 
 echo "Pulling new images..."

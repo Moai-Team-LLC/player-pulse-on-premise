@@ -32,7 +32,7 @@ print_usage() {
 Usage: ./preflight.sh [flags]
 
   --adapters=...                 Comma-separated, check these adapters' ports too
-                                 (mailgun, voiso, sms-retail)
+                                 (mailgun, voiso, sms-retail, intercom)
   --domain=...                   Check DNS for the main CRM domain
   --super-admin-domain=...       Check DNS for the super admin domain
 
@@ -45,6 +45,7 @@ Usage: ./preflight.sh [flags]
   --adapter-mailgun-port=...     Host port to check for the mailgun adapter (defaults to 8002)
   --adapter-voiso-port=...       Host port to check for the voiso adapter (defaults to 8003)
   --adapter-sms-retail-port=...  Host port to check for the sms-retail adapter (defaults to 8004)
+  --adapter-intercom-port=...    Host port to check for the intercom adapter (defaults to 8005)
 
   --help, -h                     Show this message and exit
 USAGE
@@ -55,7 +56,7 @@ DOMAIN=""
 SUPER_ADMIN_DOMAIN=""
 API_PORT="" CONNECTOR_PORT="" FRONTEND_PORT="" SUPERADMIN_PORT=""
 MINIO_PORT="" MINIO_CONSOLE_PORT=""
-ADAPTER_MAILGUN_PORT="" ADAPTER_VOISO_PORT="" ADAPTER_SMS_RETAIL_PORT=""
+ADAPTER_MAILGUN_PORT="" ADAPTER_VOISO_PORT="" ADAPTER_SMS_RETAIL_PORT="" ADAPTER_INTERCOM_PORT=""
 
 # shellcheck disable=SC2034  # the port vars set below are dereferenced indirectly via "${!name}" in the port-checking loops further down
 for arg in "$@"; do
@@ -72,6 +73,7 @@ for arg in "$@"; do
     --adapter-mailgun-port=*) ADAPTER_MAILGUN_PORT="${arg#*=}" ;;
     --adapter-voiso-port=*) ADAPTER_VOISO_PORT="${arg#*=}" ;;
     --adapter-sms-retail-port=*) ADAPTER_SMS_RETAIL_PORT="${arg#*=}" ;;
+    --adapter-intercom-port=*) ADAPTER_INTERCOM_PORT="${arg#*=}" ;;
     --help|-h) print_usage; exit 0 ;;
     *) echo "Unknown argument: $arg" >&2; exit 1 ;;
   esac
@@ -99,6 +101,7 @@ resolve MINIO_CONSOLE_PORT 9001
 resolve ADAPTER_MAILGUN_PORT 8002
 resolve ADAPTER_VOISO_PORT 8003
 resolve ADAPTER_SMS_RETAIL_PORT 8004
+resolve ADAPTER_INTERCOM_PORT 8005
 
 if [ -z "$ADAPTER_PROFILES" ]; then
   ADAPTER_PROFILES="$(env_value COMPOSE_PROFILES)"
@@ -258,6 +261,9 @@ if [ -n "$ADAPTER_PROFILES" ]; then
   fi
   if [[ ",$ADAPTER_PROFILES," == *",sms-retail,"* ]]; then
     port_names+=(ADAPTER_SMS_RETAIL_PORT); port_labels+=("SMS-RETAIL adapter")
+  fi
+  if [[ ",$ADAPTER_PROFILES," == *",intercom,"* ]]; then
+    port_names+=(ADAPTER_INTERCOM_PORT); port_labels+=("Intercom adapter")
   fi
 else
   echo "  (adapter ports not checked — no --adapters=... given and no COMPOSE_PROFILES in an existing .env)"

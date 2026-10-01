@@ -25,8 +25,9 @@ provided when your contract is signed.
 
 `postgres`, `redis`, and the adapter containers are always defined in the
 stack; adapters simply don't start until activated. `minio` is the default
-file storage and can be swapped for your own S3-compatible provider — see
-"Using External Object Storage" in section 5.
+file storage — convenient for getting started, with zero extra signup. For
+a real production install, we recommend pointing at your own S3-compatible
+provider instead; see "Using External Object Storage" in section 5.
 
 ---
 
@@ -47,7 +48,7 @@ You do **not** need any GitHub account, token, or credentials of any kind to
 pull the Docker images or clone this repository — everything is public.
 
 You do **not** need credentials for any optional adapter (Mailgun for player
-communication, Voiso, SMS-RETAIL, etc.) to install. Activating an adapter
+communication, Voiso, SMS-RETAIL, Intercom for chat, etc.) to install. Activating an adapter
 just starts its container; the actual account credentials for that
 integration are entered later, per project, inside the CRM's project
 settings once you're logged in — see section 4.
@@ -124,6 +125,7 @@ runs if you activate it. Currently available:
 | `mailgun`    | Sending player-facing email             |
 | `voiso`      | Telephony (click-to-call, call logging) |
 | `sms-retail` | SMS messaging                           |
+| `intercom`   | Live chat                               |
 
 You don't need to decide everything up front — activating an adapter is a
 one-line edit to `.env` at any time, no reinstall needed:
@@ -160,6 +162,7 @@ something already running on your server.
 | Mailgun adapter    |    8002 | `--adapter-mailgun-port=`    |
 | Voiso adapter      |    8003 | `--adapter-voiso-port=`      |
 | SMS-RETAIL adapter |    8004 | `--adapter-sms-retail-port=` |
+| Intercom adapter   |    8005 | `--adapter-intercom-port=`   |
 
 Every port must be unique — even for an adapter you haven't activated yet,
 since its port is still reserved in `.env` for whenever you do activate it.
@@ -220,6 +223,7 @@ Pass all required flags to run fully non-interactively.
   --adapter-mailgun-port=...     Host port for the mailgun adapter (defaults to 8002)
   --adapter-voiso-port=...       Host port for the voiso adapter (defaults to 8003)
   --adapter-sms-retail-port=...  Host port for the sms-retail adapter (defaults to 8004)
+  --adapter-intercom-port=...    Host port for the intercom adapter (defaults to 8005)
 
   --resume                       Reuse an existing .env instead of generating a new one
                                  (use this to retry after a failed first-time install)
@@ -267,14 +271,17 @@ and outside the server itself.
 Log in with the credentials printed at the end of the install, then change
 the password immediately.
 
-### Using External Object Storage (Optional)
+### Using External Object Storage (Recommended for Production)
 
-MinIO ships bundled by default — zero extra setup, works out of the box for
-tenant branding assets (logos) and call recordings (once you activate a
-telephony adapter). If you'd rather use your own S3-compatible storage (AWS
-S3, DigitalOcean Spaces, Cloudflare R2, Backblaze B2, Wasabi, or anything
-else that speaks the S3 API), you can swap it in instead. This is entirely
-optional — skip this if MinIO is fine for you.
+MinIO ships bundled by default — zero extra setup, which is convenient for
+getting started or trying things out. For a real production install, we
+recommend switching to your own S3-compatible storage (AWS S3, DigitalOcean
+Spaces, Cloudflare R2, Backblaze B2, Wasabi, or anything else that speaks
+the S3 API) instead of relying long-term on the bundled MinIO container —
+it's one less piece of infrastructure your server has to run and keep
+patched, and it's managed storage instead of a container you're responsible
+for. This is optional for a trial install — skip it for now if you're just
+evaluating, but plan to come back to it before going live with real data.
 
 1. Create the bucket on your provider and generate an access key/secret pair
    for it.
@@ -368,6 +375,14 @@ server {
 
     location /webhooks/sms-retail {
         proxy_pass http://localhost:8004;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /webhooks/intercom {
+        proxy_pass http://localhost:8005;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

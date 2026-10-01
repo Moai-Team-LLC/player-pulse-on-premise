@@ -53,6 +53,7 @@ Pass all required flags to run fully non-interactively.
   --adapter-mailgun-port=...     Host port for the mailgun adapter (defaults to 8002)
   --adapter-voiso-port=...       Host port for the voiso adapter (defaults to 8003)
   --adapter-sms-retail-port=...  Host port for the sms-retail adapter (defaults to 8004)
+  --adapter-intercom-port=...    Host port for the intercom adapter (defaults to 8005)
 
   --resume                       Reuse an existing .env instead of generating a new one
                                  (use this to retry after a failed first-time install)
@@ -87,6 +88,7 @@ MINIO_CONSOLE_PORT=""
 ADAPTER_MAILGUN_PORT=""
 ADAPTER_VOISO_PORT=""
 ADAPTER_SMS_RETAIL_PORT=""
+ADAPTER_INTERCOM_PORT=""
 RESUME=false
 
 for arg in "$@"; do
@@ -116,6 +118,7 @@ for arg in "$@"; do
     --adapter-mailgun-port=*) ADAPTER_MAILGUN_PORT="${arg#*=}" ;;
     --adapter-voiso-port=*) ADAPTER_VOISO_PORT="${arg#*=}" ;;
     --adapter-sms-retail-port=*) ADAPTER_SMS_RETAIL_PORT="${arg#*=}" ;;
+    --adapter-intercom-port=*) ADAPTER_INTERCOM_PORT="${arg#*=}" ;;
     --resume) RESUME=true ;;
     --help|-h)
       print_usage
@@ -148,7 +151,8 @@ if ! ./preflight.sh \
   --minio-console-port="$MINIO_CONSOLE_PORT" \
   --adapter-mailgun-port="$ADAPTER_MAILGUN_PORT" \
   --adapter-voiso-port="$ADAPTER_VOISO_PORT" \
-  --adapter-sms-retail-port="$ADAPTER_SMS_RETAIL_PORT"
+  --adapter-sms-retail-port="$ADAPTER_SMS_RETAIL_PORT" \
+  --adapter-intercom-port="$ADAPTER_INTERCOM_PORT"
 then
   echo >&2
   echo "Preflight found critical issues — fix them, then re-run ./install.sh." >&2
@@ -223,7 +227,7 @@ else
     echo
     echo "Adapters are optional — you can skip this and add one later by editing"
     echo "COMPOSE_PROFILES in .env and running docker compose up -d."
-    echo "Available: mailgun, voiso, sms-retail"
+    echo "Available: mailgun, voiso, sms-retail, intercom"
     read -r -p "Adapters to activate now (comma-separated, or blank to skip): " ADAPTER_PROFILES || true
   fi
 
@@ -231,9 +235,9 @@ else
     IFS=',' read -ra profiles <<< "$ADAPTER_PROFILES"
     for p in "${profiles[@]}"; do
       case "$p" in
-        mailgun|voiso|sms-retail) ;;
+        mailgun|voiso|sms-retail|intercom) ;;
         *)
-          echo "Unknown adapter: '$p' — must be one of: mailgun, voiso, sms-retail" >&2
+          echo "Unknown adapter: '$p' — must be one of: mailgun, voiso, sms-retail, intercom" >&2
           exit 1
           ;;
       esac
@@ -264,12 +268,17 @@ else
   else
     ADAPTER_SMS_RETAIL_PORT="${ADAPTER_SMS_RETAIL_PORT:-8004}"
   fi
+  if [[ ",$ADAPTER_PROFILES," == *",intercom,"* ]]; then
+    prompt_with_default ADAPTER_INTERCOM_PORT "Intercom adapter port" 8005
+  else
+    ADAPTER_INTERCOM_PORT="${ADAPTER_INTERCOM_PORT:-8005}"
+  fi
 
   # Every port must be unique, even across adapters you haven't activated yet
   # — otherwise activating one later, with a port that collides with something
   # already running, fails with a confusing Docker bind error at that point
   # instead of here, where it's easy to fix.
-  port_names=(API_PORT CONNECTOR_PORT FRONTEND_PORT SUPERADMIN_PORT MINIO_PORT MINIO_CONSOLE_PORT ADAPTER_MAILGUN_PORT ADAPTER_VOISO_PORT ADAPTER_SMS_RETAIL_PORT)
+  port_names=(API_PORT CONNECTOR_PORT FRONTEND_PORT SUPERADMIN_PORT MINIO_PORT MINIO_CONSOLE_PORT ADAPTER_MAILGUN_PORT ADAPTER_VOISO_PORT ADAPTER_SMS_RETAIL_PORT ADAPTER_INTERCOM_PORT)
   for ((i = 0; i < ${#port_names[@]}; i++)); do
     for ((j = i + 1; j < ${#port_names[@]}; j++)); do
       name_i="${port_names[i]}"
@@ -361,6 +370,7 @@ MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT}
 ADAPTER_MAILGUN_PORT=${ADAPTER_MAILGUN_PORT}
 ADAPTER_VOISO_PORT=${ADAPTER_VOISO_PORT}
 ADAPTER_SMS_RETAIL_PORT=${ADAPTER_SMS_RETAIL_PORT}
+ADAPTER_INTERCOM_PORT=${ADAPTER_INTERCOM_PORT}
 
 COMPOSE_PROFILES=${ADAPTER_PROFILES}
 
