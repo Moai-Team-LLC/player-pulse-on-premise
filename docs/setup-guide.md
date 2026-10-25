@@ -113,7 +113,6 @@ You'll be asked for:
 | Email for the initial super admin account       | This becomes your first login                                                                            |
 | Adapters to activate now (optional)             | Comma-separated, e.g. `mailgun,voiso`. Leave blank to start with none — see "Adapters" below             |
 | Host ports (optional)                           | Press Enter to accept the defaults shown, or enter a different port if one conflicts — see "Ports" below |
-| MinIO public URL (optional)                     | Only needed if you want uploaded files reachable directly from a browser; safe to leave blank for now    |
 
 ### Adapters
 
@@ -207,7 +206,6 @@ Pass all required flags to run fully non-interactively.
 
   --mail-sender=...              Sender email, e.g. "Your Company <noreply@yourcompany.com>"
   --cors-origins=...             Optional, derived from the two domains above if omitted
-  --s3-public-url=...            Optional, only needed for public file URLs
   --super-admin-email=...        Email for the initial super admin account
 
   --adapters=...                 Optional, comma-separated. Leave empty to run with none —
@@ -292,13 +290,11 @@ evaluating, but plan to come back to it before going live with real data.
    S3_BUCKET=<your bucket name>
    S3_ACCESS_KEY=<your access key>
    S3_SECRET_KEY=<your secret key>
-   S3_USE_ACL=true
-   S3_PUBLIC_URL=<your provider's public/CDN URL for this bucket, if it has one>
    ```
-   `S3_ENDPOINT` is the plain API endpoint only — no bucket name in it. Some
-   providers publish public assets (like tenant branding logos) through a
-   separate CDN/public URL that includes the bucket name — if yours does,
-   that full URL goes in `S3_PUBLIC_URL`, not `S3_ENDPOINT`.
+   `S3_ENDPOINT` is the plain API endpoint only — no bucket name in it. Keep
+   the bucket private: Player Pulse serves uploaded images (email images,
+   logos, favicons) itself at `https://<your CRM domain>/api/v1/public/files/...`,
+   so the bucket needs no public access, public URL or CDN.
 3. Remove MinIO from the compose file — open `docker-compose.on-premise.yml`
    and delete the `minio` and `minio-init` service blocks, the `minio_data`
    volume at the bottom, and the `minio-init:` entry under `depends_on:` in

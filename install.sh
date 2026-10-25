@@ -37,7 +37,6 @@ Pass all required flags to run fully non-interactively.
 
   --mail-sender=...              Sender email, e.g. "Your Company <noreply@yourcompany.com>"
   --cors-origins=...             Optional, derived from the two domains above if omitted
-  --s3-public-url=...            Optional, only needed for public file URLs
   --super-admin-email=...        Email for the initial super admin account
 
   --adapters=...                 Optional, comma-separated. Leave empty to run with none —
@@ -76,7 +75,6 @@ SMTP_USERNAME=""
 SMTP_PASSWORD=""
 MAIL_SENDER_EMAIL=""
 CORS_ORIGINS=""
-S3_PUBLIC_URL=""
 BOOTSTRAP_SUPER_ADMIN_EMAIL=""
 ADAPTER_PROFILES=""
 API_PORT=""
@@ -106,7 +104,6 @@ for arg in "$@"; do
     --smtp-password=*) SMTP_PASSWORD="${arg#*=}" ;;
     --mail-sender=*) MAIL_SENDER_EMAIL="${arg#*=}" ;;
     --cors-origins=*) CORS_ORIGINS="${arg#*=}" ;;
-    --s3-public-url=*) S3_PUBLIC_URL="${arg#*=}" ;;
     --super-admin-email=*) BOOTSTRAP_SUPER_ADMIN_EMAIL="${arg#*=}" ;;
     --adapters=*) ADAPTER_PROFILES="${arg#*=}" ;;
     --api-port=*) API_PORT="${arg#*=}" ;;
@@ -297,14 +294,6 @@ else
     echo "CORS_ORIGINS derived as: $CORS_ORIGINS"
   fi
 
-  if [ -z "$S3_PUBLIC_URL" ]; then
-    echo
-    echo "S3_PUBLIC_URL is optional — only needed if you want uploaded files to be"
-    echo "reachable directly from the browser (via your own reverse proxy in front"
-    echo "of MinIO). Leave blank if you don't need public file URLs yet."
-    read -r -p "MinIO public URL (optional, e.g. https://files.client.com): " S3_PUBLIC_URL || true
-  fi
-
   # ── Validate required fields ────────────────────────────────────────────────
   missing=()
   [ -z "$BASE_DOMAIN" ] && missing+=("--domain (BASE_DOMAIN)")
@@ -428,8 +417,6 @@ ADAPTER_CREDENTIALS_MASTER_KEY=${ADAPTER_CREDENTIALS_MASTER_KEY}
 S3_ENDPOINT=http://minio:9000
 S3_REGION=us-east-1
 S3_BUCKET=player-pulse
-S3_USE_ACL=false
-S3_PUBLIC_URL=${S3_PUBLIC_URL}
 
 MINIO_ROOT_USER=${MINIO_ROOT_USER}
 MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}

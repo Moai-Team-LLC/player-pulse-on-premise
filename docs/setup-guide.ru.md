@@ -117,7 +117,6 @@ chmod +x install.sh update.sh
 | Email для первого аккаунта супер-администратора  | Это будет ваш первый логин                                                                                       |
 | Адаптеры для активации сейчас (опционально)      | Через запятую, например `mailgun,voiso`. Оставьте пустым, чтобы начать без них — см. «Адаптеры» ниже             |
 | Порты сервисов (опционально)                     | Нажмите Enter, чтобы принять значения по умолчанию, или введите другой порт при конфликте — см. «Порты» ниже     |
-| Публичный URL MinIO (опционально)                | Нужен только если хотите, чтобы загруженные файлы были доступны напрямую из браузера; пока можно оставить пустым |
 
 ### Адаптеры
 
@@ -215,7 +214,6 @@ Pass all required flags to run fully non-interactively.
 
   --mail-sender=...              Sender email, e.g. "Your Company <noreply@yourcompany.com>"
   --cors-origins=...             Optional, derived from the two domains above if omitted
-  --s3-public-url=...            Optional, only needed for public file URLs
   --super-admin-email=...        Email for the initial super admin account
 
   --adapters=...                 Optional, comma-separated. Leave empty to run with none —
@@ -301,14 +299,12 @@ DigitalOcean Spaces, Cloudflare R2, Backblaze B2, Wasabi или любое др�
    S3_BUCKET=<имя вашего бакета>
    S3_ACCESS_KEY=<ваш access key>
    S3_SECRET_KEY=<ваш secret key>
-   S3_USE_ACL=true
-   S3_PUBLIC_URL=<публичный/CDN URL вашего провайдера для этого бакета, если есть>
    ```
    `S3_ENDPOINT` — это только сам API-эндпоинт, без имени бакета в нём.
-   Некоторые провайдеры публикуют публичные файлы (например, логотипы
-   брендинга тенанта) через отдельный CDN/публичный URL, который уже
-   включает имя бакета — если это ваш случай, полный URL идёт в
-   `S3_PUBLIC_URL`, а не в `S3_ENDPOINT`.
+   Оставьте бакет приватным: Player Pulse сам отдаёт загруженные изображения
+   (картинки писем, логотипы, фавиконки) по адресу
+   `https://<домен вашей CRM>/api/v1/public/files/...`, поэтому бакету не нужен
+   ни публичный доступ, ни публичный URL, ни CDN.
 3. Уберите MinIO из compose-файла — откройте
    `docker-compose.on-premise.yml` и удалите блоки сервисов `minio` и
    `minio-init`, том `minio_data` внизу файла, а также запись
