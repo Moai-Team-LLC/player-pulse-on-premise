@@ -16,6 +16,7 @@ Player Pulse runs as a set of Docker containers on your server:
 | `frontend`                   | The CRM web interface your team uses                                                                                                      |
 | `superadmin`                 | Admin panel for managing tenants and users                                                                                                |
 | `outbox_worker`              | Background worker for async email/event delivery                                                                                          |
+| `import_worker`              | Background worker that runs player and lead imports from CSV / Excel files                                                                |
 | `postgres`, `redis`, `minio` | Database, cache, and file storage                                                                                                         |
 | adapters                     | Optional integrations (email, telephony, SMS, chat ...) — each only runs if you activate it; see section 4 for what's currently available |
 
@@ -298,9 +299,9 @@ evaluating, but plan to come back to it before going live with real data.
 3. Remove MinIO from the compose file — open `docker-compose.on-premise.yml`
    and delete the `minio` and `minio-init` service blocks, the `minio_data`
    volume at the bottom, and the `minio-init:` entry under `depends_on:` in
-   both `api` and `adapter_voiso` (only remove that dependency, not the whole
-   `depends_on:` block — `api` and `adapter_voiso` still depend on `postgres`
-   and `redis`).
+   `api`, `outbox_worker`, `import_worker` and `adapter_voiso` (only remove
+   that dependency, not the whole `depends_on:` block — these services still
+   depend on `postgres` and `redis`).
 4. Restart:
    ```bash
    docker compose -f docker-compose.on-premise.yml up -d --remove-orphans
@@ -343,6 +344,9 @@ server {
     location /api/v1 {
         client_max_body_size 75M;
         proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -401,6 +405,9 @@ server {
     location /api/v1 {
         client_max_body_size 75M;
         proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
